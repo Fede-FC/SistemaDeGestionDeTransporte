@@ -185,7 +185,7 @@ backend/
 
 # 7. Flujo de funcionamiento
 
-1. El usuario registra un viaje  
+1. El usuario registra un viaje
 2. El sistema almacena el viaje en la base de datos  
 3. El usuario registra gastos asociados  
 4. El sistema calcula totales automáticamente  
@@ -219,7 +219,8 @@ backend/
 
 # 10. Plan de mejoras futuras
 
-- Dashboard con gráficos avanzados  
+- Dashboard con gráficos avanzados
+- Facturación Automatica afiliada a el Ministerio de Hacienda 
 - Exportación a Excel y PDF  
 - Control de mantenimiento de vehículos  
 - Multiusuario  
