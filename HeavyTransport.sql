@@ -1,0 +1,95 @@
+-- Create database
+
+
+-- ============================================
+-- Employees / Drivers
+-- ============================================
+CREATE TABLE employees (
+    employeeid SERIAL PRIMARY KEY,
+    id_number VARCHAR(20) UNIQUE NOT NULL,
+    fullname VARCHAR(80) NOT NULL,
+    hire_date DATE NOT NULL,
+    termination_date DATE,
+    active BOOLEAN DEFAULT TRUE
+);
+
+-- ============================================
+-- Vehicles
+-- ============================================
+CREATE TABLE vehicles (
+    vehicleid SERIAL PRIMARY KEY,
+    plate VARCHAR(20) UNIQUE NOT NULL,
+    brand VARCHAR(40) NOT NULL,
+    model VARCHAR(40) NOT NULL,
+    year INT CHECK (year >= 1980 AND year <= EXTRACT(YEAR FROM CURRENT_DATE)),
+    active BOOLEAN DEFAULT TRUE
+);
+
+-- ============================================
+-- Clients
+-- ============================================
+CREATE TABLE clients (
+    clientid SERIAL PRIMARY KEY,
+    name VARCHAR(80) NOT NULL,
+    contact VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================
+-- Trip States (for billing workflow)
+-- ============================================
+CREATE TABLE trip_states (
+    stateid SERIAL PRIMARY KEY,
+    name VARCHAR(30) UNIQUE NOT NULL
+);
+
+-- Predefined states
+INSERT INTO trip_states (name) VALUES
+('Trip completed'),
+('Pending billing'),
+('Invoice sent'),
+('Invoice accepted'),
+('Invoice paid');
+
+-- ============================================
+-- Trips
+-- ============================================
+CREATE TABLE trips (
+    tripid SERIAL PRIMARY KEY,
+    trip_date DATE NOT NULL,
+    vehicleid INT NOT NULL REFERENCES vehicles(vehicleid),
+    driverid INT NOT NULL REFERENCES employees(employeeid),
+    origin VARCHAR(100) NOT NULL,
+    destination VARCHAR(100) NOT NULL,
+    clientid INT NOT NULL REFERENCES clients(clientid),
+    payment_received NUMERIC(12,2) DEFAULT 0,
+    container_number VARCHAR(30),
+    invoice_number VARCHAR(30),
+    description VARCHAR(200),
+    stateid INT REFERENCES trip_states(stateid) DEFAULT 2, -- Pending billing
+    billing_date TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================
+-- Expenses
+-- ============================================
+CREATE TABLE expenses (
+    expenseid SERIAL PRIMARY KEY,
+    expense_type VARCHAR(40) NOT NULL CHECK (expense_type IN ('Fuel','Tolls','Maintenance','Repairs','Other')),
+    amount NUMERIC(12,2) NOT NULL CHECK (amount >= 0),
+    description VARCHAR(200),
+    tripid INT REFERENCES trips(tripid),
+    vehicleid INT REFERENCES vehicles(vehicleid),
+    expense_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================
+-- Indexes for performance
+-- ============================================
+CREATE INDEX idx_trips_date ON trips(trip_date);
+CREATE INDEX idx_expenses_trip ON expenses(tripid);
