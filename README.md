@@ -4,14 +4,8 @@
 
 Este proyecto consiste en el desarrollo de un sistema web para la **gestión de viajes, gastos y vehículos** de una empresa familiar dedicada al transporte de carga pesada.
 
-Actualmente la información operativa se registra en papel y hojas de cálculo, lo cual dificulta:
 
-- la organización de los datos
-- el acceso rápido al historial de viajes
-- el control de gastos e ingresos
-- el análisis del rendimiento del negocio
-
-El sistema propuesto permitirá **centralizar toda la información en una base de datos**, facilitando el registro, consulta y análisis de las operaciones.
+El sistema propuesto permitirá **centralizar toda la información en una base de datos**, facilitando el registro, consulta, análisis de las operaciones y permitir la facturación automtica con el Ministerio de Hacienda.
 
 El desarrollo iniciará como una **aplicación local** y posteriormente podrá ser desplegado en un **servidor web**, permitiendo acceso desde computadora o dispositivos móviles.
 
@@ -66,18 +60,29 @@ Permite ingresar información operativa al sistema.
 - Destino
 - Cliente
 - Pago recibido
+- numero de contenedor
+- numero de factura
+- Descripcion
 
 **Registro de gastos**
 - Tipo de gasto (combustible, peajes, mantenimiento, reparaciones, etc.)
 - Monto
 - Descripción
 - Asociación a un viaje
+- Asociar a un camion
 
 **Gestión de vehículos**
 - Placa
 - Marca
 - Modelo
 - Año
+
+** Empleados/Choferes**
+- Cedula
+- Nombre
+- Contradado
+- Renuncia/salida
+- Activo
 
 ---
 
@@ -154,6 +159,8 @@ Validación del sistema con datos reales y mejoras de usabilidad.
 
 ### Fase 5 – Despliegue en servidor
 Publicación del sistema para acceso desde múltiples dispositivos.
+Integración de facturación electrónica
+
 
 ---
 
