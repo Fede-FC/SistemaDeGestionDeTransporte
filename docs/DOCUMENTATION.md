@@ -121,7 +121,72 @@ El cliente (navegador web) realiza solicitudes HTTP al servidor backend, el cual
 
 ## 4.3 Diagrama entidad–relación
 
-*(Insertar aquí imagen o diagrama ER en el futuro)*
++------------------+
+|      users       |
++------------------+
+| userid (PK)      |
+| username         |
+| email            |
+| password_hash    |
+| active           |
+| created_at       |
+| updated_at       |
++------------------+
+       |  ^   ^   ^
+       |  |   |   |
+       v  v   v   v
++------------------+        +------------------+
+|    employees     |        |    vehicles      |
++------------------+        +------------------+
+| employeeid (PK)  |        | vehicleid (PK)   |
+| id_number        |        | plate            |
+| fullname         |        | brand            |
+| hire_date        |        | model            |
+| termination_date |        | year             |
+| active           |        | active           |
+| userid (FK) ---->+        | userid (FK) ---->+
++------------------+        +------------------+
+          |                           |
+          v                           v
++------------------+        +------------------+
+|      trips       |        |    expenses      |
++------------------+        +------------------+
+| tripid (PK)      |        | expenseid (PK)   |
+| trip_date        |        | expense_type     |
+| vehicleid (FK)   |        | amount           |
+| driverid (FK)    |        | description      |
+| origin           |        | tripid (FK)      |
+| destination      |        | vehicleid (FK)   |
+| clientid (FK)    |        | userid (FK) ---->+
+| payment_received |        | expense_date     |
+| container_number |        | created_at       |
+| invoice_number   |        | updated_at       |
+| description      |        +------------------+
+| stateid (FK) --> trip_states
+| billing_date     |
+| userid (FK) ---->+
+| created_at       |
+| updated_at       |
++------------------+
+          ^
+          |
++------------------+
+|     clients      |
++------------------+
+| clientid (PK)    |
+| name             |
+| contact          |
+| userid (FK) ---->+
+| created_at       |
+| updated_at       |
++------------------+
+
++------------------+
+|   trip_states    |
++------------------+
+| stateid (PK)     |
+| name             |
++------------------+
 
 ---
 
