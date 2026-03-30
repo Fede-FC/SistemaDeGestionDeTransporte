@@ -296,3 +296,12 @@ backend/
 # 11. Conclusión
 
 Este sistema busca digitalizar y optimizar la gestión administrativa de una empresa de transporte, al mismo tiempo que sirve como proyecto práctico de formación en ingeniería informática.
+
+---
+
+# 12. Fuentes
+
+https://www.postgresql.org/docs/current/ddl-constraints.html#DDL-CONSTRAINTS-CHECK-CONSTRAINTS
+https://node-postgres.com/
+
+
