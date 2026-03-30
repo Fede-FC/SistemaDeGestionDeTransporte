@@ -1,5 +1,19 @@
 -- Create database
+CREATE DATABASE heavy_transport;
+\c heavy_transport;
 
+-- ============================================
+-- System Users
+-- ============================================
+CREATE TABLE users (
+    userid SERIAL PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password_hash VARCHAR(200) NOT NULL,
+    active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
 -- ============================================
 -- Employees / Drivers
@@ -10,7 +24,8 @@ CREATE TABLE employees (
     fullname VARCHAR(80) NOT NULL,
     hire_date DATE NOT NULL,
     termination_date DATE,
-    active BOOLEAN DEFAULT TRUE
+    active BOOLEAN DEFAULT TRUE,
+    userid INT NOT NULL REFERENCES users(userid) -- owner
 );
 
 -- ============================================
@@ -22,7 +37,8 @@ CREATE TABLE vehicles (
     brand VARCHAR(40) NOT NULL,
     model VARCHAR(40) NOT NULL,
     year INT CHECK (year >= 1980 AND year <= EXTRACT(YEAR FROM CURRENT_DATE)),
-    active BOOLEAN DEFAULT TRUE
+    active BOOLEAN DEFAULT TRUE,
+    userid INT NOT NULL REFERENCES users(userid) -- owner
 );
 
 -- ============================================
@@ -32,6 +48,7 @@ CREATE TABLE clients (
     clientid SERIAL PRIMARY KEY,
     name VARCHAR(80) NOT NULL,
     contact VARCHAR(100),
+    userid INT NOT NULL REFERENCES users(userid), -- owner
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -69,6 +86,7 @@ CREATE TABLE trips (
     description VARCHAR(200),
     stateid INT REFERENCES trip_states(stateid) DEFAULT 2, -- Pending billing
     billing_date TIMESTAMP,
+    userid INT NOT NULL REFERENCES users(userid), -- owner
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -83,6 +101,7 @@ CREATE TABLE expenses (
     description VARCHAR(200),
     tripid INT REFERENCES trips(tripid),
     vehicleid INT REFERENCES vehicles(vehicleid),
+    userid INT NOT NULL REFERENCES users(userid), -- owner
     expense_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
