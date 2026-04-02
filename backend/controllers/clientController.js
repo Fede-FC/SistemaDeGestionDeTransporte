@@ -46,11 +46,12 @@ const createClient = async (req, res) => {
 const updateClient = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, contact } = req.body;
+    const { name, contact, active } = req.body;
     const result = await pool.query(
-      `UPDATE clients SET name=$1, contact=$2, updated_at=CURRENT_TIMESTAMP
-       WHERE clientid=$3 AND userid=$4 RETURNING *`,
-      [name, contact || null, id, OWNER_ID]
+      `UPDATE clients 
+       SET name=$1, contact=$2, active=$3, updated_at=CURRENT_TIMESTAMP
+       WHERE clientid=$4 AND userid=$5 RETURNING *`,
+      [name, contact || null, active !== undefined ? active : true, id, OWNER_ID]
     );
     if (result.rows.length === 0)
       return res.status(404).json({ error: 'Cliente no encontrado' });
