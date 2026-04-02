@@ -1,6 +1,6 @@
 # Sistema de Gestión de Transporte de Carga
 
-
+![Heavy Transport](docs/cover.svg)
 ![Heavy Transport](https://img.shields.io/badge/Estado-En%20Producción-brightgreen)
 ![Version](https://img.shields.io/badge/Versión-1.0.0-blue)
 ![License](https://img.shields.io/badge/Licencia-MIT-yellow)
