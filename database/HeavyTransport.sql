@@ -7,7 +7,7 @@
 --   3. Usuario local único para período de prueba
 -- ============================================================
 
-\c heavy_transport;
+
 
 -- ============================================
 -- System Users

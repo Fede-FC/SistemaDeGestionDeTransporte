@@ -9,31 +9,41 @@
 Este documento describe la arquitectura, diseño, funcionamiento y decisiones técnicas del sistema. Sirve como guía para desarrolladores, evaluación académica y mantenimiento futuro.
 
 ## 1.2 Alcance del sistema
-El sistema digitaliza el proceso administrativo de una empresa de transporte de carga pesada, cubriendo registro de viajes, gastos, vehículos, empleados y clientes, con un dashboard de resumen financiero.
+El sistema digitaliza el proceso administrativo de una empresa de transporte de carga pesada, cubriendo registro de viajes, gastos, vehículos, empleados y clientes, con un dashboard de resumen financiero. Está desplegado en producción y disponible desde cualquier dispositivo con internet.
 
-## 1.3 Definiciones y términos
+## 1.3 URLs de producción
+
+| Servicio | URL |
+|---------|-----|
+| Frontend | https://sistema-de-gestion-de-transporte-6g.vercel.app |
+| Backend API | https://inspiring-friendship-production-b55f.up.railway.app |
+| Repositorio | https://github.com/Fede-FC/SistemaDeGestionDeTransporte |
+
+## 1.4 Definiciones y términos
 
 | Término | Descripción |
 |--------|------------|
 | Viaje | Operación de transporte realizada por un vehículo |
 | Gasto | Costo asociado a un viaje, vehículo, o sin asociación |
-| Soft delete | Desactivación lógica de un registro sin eliminarlo físicamente |
 | DUA | Documento Único Administrativo — documento aduanero |
+| Soft delete | Desactivación lógica sin eliminar físicamente el registro |
 | JWT | JSON Web Token — mecanismo de autenticación sin sesión |
 | Trigger | Función de base de datos que se ejecuta automáticamente |
+| CORS | Cross-Origin Resource Sharing — control de acceso entre dominios |
 
 ---
 
 # 2. Descripción general del sistema
 
 ## 2.1 Perspectiva del sistema
-Aplicación web de tres capas: frontend React, API backend Node.js/Express, y base de datos PostgreSQL en Docker. Funciona en entorno local durante el período de prueba.
+Aplicación web de tres capas desplegada en la nube: frontend React en Vercel, API backend Node.js/Express en Railway, y base de datos PostgreSQL en Railway.
 
 ## 2.2 Funciones principales
 - Autenticación segura con JWT
-- Dashboard con resumen financiero
+- Dashboard con resumen financiero filtrable por período
 - CRUD completo de viajes, gastos, vehículos, empleados y clientes
 - Filtros por fecha, vehículo, cliente y conductor
+- Búsqueda de viajes por número de contenedor
 - Cálculo automático de gastos totales y ganancia por viaje
 - Soft delete en todas las entidades principales
 
@@ -43,11 +53,6 @@ Aplicación web de tres capas: frontend React, API backend Node.js/Express, y ba
 |--------|--------------|----------|
 | Administrador | Básico | Acceso completo al sistema |
 
-## 2.4 Restricciones
-- Versión local para un único usuario (OWNER_ID = 1)
-- Requiere Docker Desktop con integración WSL2 activa
-- Sin HTTPS en versión local
-
 ---
 
 # 3. Arquitectura del sistema
@@ -55,36 +60,38 @@ Aplicación web de tres capas: frontend React, API backend Node.js/Express, y ba
 ## 3.1 Arquitectura general
 
 ```
-Frontend React (puerto 3001)
+Usuario (navegador)
+│
+Frontend React — Vercel
 │  axios con interceptores JWT
 │  react-router-dom para navegación
 │
-Backend Express API (puerto 3000)
-│  middleware verifyToken en rutas protegidas
+Backend Express API — Railway
+│  middleware verifyToken
 │  controllers con queries parametrizadas
 │
-PostgreSQL en Docker (puerto 5432)
-│  triggers de validación y defaults
+PostgreSQL — Railway
+│  triggers de validación
 │  índices para rendimiento
-│  volumen persistente heavy_transport_data
 ```
 
 ## 3.2 Flujo de autenticación
 1. Usuario envía credenciales al endpoint `/api/auth/login`
 2. Backend valida con bcrypt y genera token JWT (8h de vigencia)
 3. Frontend guarda el token en `localStorage`
-4. Cada request incluye `Authorization: Bearer <token>` en el header
+4. Cada request incluye `Authorization: Bearer <token>`
 5. Middleware `verifyToken` valida el token antes de cada operación
 6. Al expirar, el interceptor de axios redirige automáticamente al login
 
-## 3.3 Entorno de desarrollo
+## 3.3 Entornos
 
-| Componente | Tecnología | Puerto |
-|-----------|-----------|--------|
-| Frontend | React 18 (create-react-app) | 3001 |
-| Backend | Node.js v24 + Express | 3000 |
-| Base de datos | PostgreSQL 16 en Docker | 5432 |
-| Sistema operativo | Ubuntu WSL2 en Windows | — |
+| Entorno | Frontend | Backend | Base de datos |
+|---------|---------|---------|--------------|
+| Local | localhost:3001 | localhost:3000 | Docker :5432 |
+| Producción | Vercel | Railway | Railway PostgreSQL |
+
+## 3.4 CORS
+El backend acepta requests únicamente desde los orígenes configurados en la variable `FRONTEND_URL`. En producción apunta al dominio de Vercel. En desarrollo acepta `localhost:3001`.
 
 ---
 
@@ -97,7 +104,6 @@ PostgreSQL en Docker (puerto 5432)
 |-------|------|-------------|
 | userid | SERIAL PK | Identificador único |
 | username | VARCHAR(50) | Nombre de usuario |
-| email | VARCHAR(100) | Correo electrónico |
 | password_hash | VARCHAR(200) | Contraseña con hash bcrypt |
 | active | BOOLEAN | Estado del usuario |
 
@@ -155,9 +161,8 @@ PostgreSQL en Docker (puerto 5432)
 | expenseid | SERIAL PK | Identificador único |
 | expense_type | VARCHAR(40) | Fuel / Tolls / Maintenance / Repairs / Other |
 | amount | NUMERIC(12,2) | Monto del gasto |
-| description | VARCHAR(200) | Descripción |
-| tripid | FK (nullable) | Viaje asociado (opcional) |
-| vehicleid | FK (nullable) | Vehículo asociado (opcional) |
+| tripid | FK nullable | Viaje asociado (opcional) |
+| vehicleid | FK nullable | Vehículo asociado (opcional) |
 | expense_date | TIMESTAMP | Fecha del gasto |
 
 ### trip_states
@@ -169,22 +174,15 @@ PostgreSQL en Docker (puerto 5432)
 | Invoice accepted | Factura aceptada |
 | Invoice paid | Factura pagada |
 
-## 4.2 Relaciones
-- Un vehículo puede tener muchos viajes
-- Un empleado puede conducir muchos viajes
-- Un cliente puede tener muchos viajes
-- Un viaje puede tener muchos gastos
-- Un gasto puede existir sin viaje ni vehículo
-
-## 4.3 Triggers
+## 4.2 Triggers
 
 ### trg_default_trip_state
-Asigna "Pending billing" como estado por defecto al crear un viaje, buscando el estado por nombre en lugar de por ID numérico. Esto protege el sistema ante cambios en los IDs de la tabla `trip_states`.
+Asigna "Pending billing" por defecto al crear un viaje, buscando el estado por nombre. Soluciona la limitación de PostgreSQL que no permite subqueries en expresiones DEFAULT.
 
 ### trg_check_expense_vehicle
-Valida que si un gasto especifica tanto un viaje como un vehículo, el vehículo del gasto coincida con el del viaje. Permite gastos sin ninguna asociación (repuestos de bodega).
+Valida que si un gasto especifica tanto un viaje como un vehículo, el vehículo coincida con el del viaje. Permite gastos sin ninguna asociación.
 
-## 4.4 Índices
+## 4.3 Índices
 ```sql
 CREATE INDEX idx_trips_date       ON trips(trip_date);
 CREATE INDEX idx_trips_client     ON trips(clientid);
@@ -202,87 +200,75 @@ CREATE INDEX idx_expenses_vehicle ON expenses(vehicleid);
 ```
 backend/
 ├── config/
-│   └── db.js              ← Pool de conexión PostgreSQL (pg)
-├── controllers/           ← Lógica de negocio y queries
+│   └── db.js       ← Pool pg, soporta DATABASE_URL (Railway) y variables separadas (local)
+├── controllers/    ← Lógica de negocio y queries
 ├── middleware/
-│   └── auth.js            ← Verificación de token JWT
-├── routes/                ← Definición de endpoints
-├── app.js                 ← Configuración Express y registro de rutas
-└── .env                   ← Variables de entorno
+│   └── auth.js     ← Verificación JWT
+├── routes/         ← Definición de endpoints
+└── app.js          ← Express + CORS + registro de rutas
 ```
 
-## 5.2 Endpoints completos
+## 5.2 Conexión a base de datos
+`config/db.js` detecta automáticamente el entorno:
+- **Producción (Railway)**: usa `DATABASE_URL` con SSL habilitado
+- **Local**: usa variables separadas `DB_HOST`, `DB_PORT`, etc.
+
+## 5.3 Endpoints completos
 
 ### Autenticación — `/api/auth`
 | Método | Ruta | Descripción |
 |--------|------|-------------|
 | POST | /login | Iniciar sesión, retorna JWT |
-| POST | /setup-password | Configurar contraseña inicial (solo setup local) |
+| POST | /setup-password | Configurar contraseña (solo setup) |
 
 ### Vehículos — `/api/vehicles`
 | Método | Ruta | Descripción |
 |--------|------|-------------|
-| GET | / | Listar todos los vehículos |
-| GET | /:id | Obtener vehículo por ID |
-| POST | / | Crear vehículo |
-| PUT | /:id | Actualizar vehículo (incluye activar/desactivar) |
-| DELETE | /:id | Soft delete — marca `active = false` |
+| GET | / | Listar vehículos |
+| GET | /:id | Obtener por ID |
+| POST | / | Crear |
+| PUT | /:id | Actualizar / activar / desactivar |
+| DELETE | /:id | Soft delete |
 
 ### Empleados — `/api/employees`
 | Método | Ruta | Descripción |
 |--------|------|-------------|
-| GET | / | Listar todos los empleados |
-| GET | /:id | Obtener empleado por ID |
-| POST | / | Crear empleado |
-| PUT | /:id | Actualizar empleado |
+| GET | / | Listar empleados |
+| GET | /:id | Obtener por ID |
+| POST | / | Crear |
+| PUT | /:id | Actualizar |
 | DELETE | /:id | Soft delete |
 
 ### Clientes — `/api/clients`
 | Método | Ruta | Descripción |
 |--------|------|-------------|
-| GET | / | Listar todos los clientes |
-| GET | /:id | Obtener cliente por ID |
-| POST | / | Crear cliente |
-| PUT | /:id | Actualizar cliente |
+| GET | / | Listar clientes |
+| GET | /:id | Obtener por ID |
+| POST | / | Crear |
+| PUT | /:id | Actualizar |
 | DELETE | /:id | Soft delete |
 
 ### Viajes — `/api/trips`
 | Método | Ruta | Descripción |
 |--------|------|-------------|
-| GET | / | Listar viajes con gastos y ganancia calculados |
+| GET | / | Listar con gastos y ganancia calculados |
 | GET | /states | Listar estados de facturación |
 | GET | /:id | Obtener viaje individual |
 | POST | / | Crear viaje |
-| PUT | /:id | Actualizar viaje y/o estado |
-| DELETE | /:id | Eliminar viaje |
+| PUT | /:id | Actualizar / cambiar estado |
+| DELETE | /:id | Eliminar |
 
-Filtros disponibles en GET `/api/trips`:
-- `?from=YYYY-MM-DD` — fecha inicio
-- `?to=YYYY-MM-DD` — fecha fin
-- `?vehicleid=N` — por vehículo
-- `?clientid=N` — por cliente
-- `?driverid=N` — por conductor
+Filtros: `?from=`, `?to=`, `?vehicleid=`, `?clientid=`, `?driverid=`
 
 ### Gastos — `/api/expenses`
 | Método | Ruta | Descripción |
 |--------|------|-------------|
 | GET | / | Listar gastos |
-| POST | / | Crear gasto |
-| PUT | /:id | Actualizar gasto |
-| DELETE | /:id | Eliminar gasto |
+| POST | / | Crear |
+| PUT | /:id | Actualizar |
+| DELETE | /:id | Eliminar |
 
-Filtros disponibles en GET `/api/expenses`:
-- `?tripid=N` — gastos de un viaje
-- `?vehicleid=N` — gastos de un vehículo
-
-## 5.3 Manejo del usuario local
-En la versión local todas las queries filtran por `OWNER_ID = 1` definido en `.env`. En producción este valor se reemplaza por el ID extraído del token JWT.
-
-## 5.4 Seguridad de queries
-Todas las queries usan parámetros preparados (`$1, $2, ...`) para prevenir SQL injection. Ejemplo:
-```js
-pool.query('SELECT * FROM vehicles WHERE userid = $1', [OWNER_ID])
-```
+Filtros: `?tripid=`, `?vehicleid=`
 
 ---
 
@@ -293,127 +279,105 @@ pool.query('SELECT * FROM vehicles WHERE userid = $1', [OWNER_ID])
 ```
 frontend/src/
 ├── pages/
-│   ├── Login.js       ← Formulario de autenticación
-│   ├── Dashboard.js   ← Resumen financiero y últimos viajes
-│   ├── Vehicles.js    ← CRUD de vehículos
-│   ├── Employees.js   ← CRUD de empleados
-│   ├── Clients.js     ← CRUD de clientes
-│   ├── Trips.js       ← CRUD de viajes con filtros
-│   └── Expenses.js    ← CRUD de gastos con filtros
+│   ├── Login.js
+│   ├── Dashboard.js
+│   ├── Vehicles.js
+│   ├── Employees.js
+│   ├── Clients.js
+│   ├── Trips.js
+│   └── Expenses.js
 ├── services/
-│   └── api.js         ← Instancia axios con interceptores JWT
+│   └── api.js        ← axios + interceptores JWT + URL dinámica
 ├── styles/
-│   └── common.js      ← Estilos compartidos entre páginas
-└── App.js             ← Router + sidebar + protección de rutas
+│   └── common.js     ← Estilos compartidos
+└── App.js            ← Router + sidebar + protección de rutas
 ```
 
-## 6.2 Sistema de estilos compartidos
-`styles/common.js` exporta cinco objetos de estilos reutilizables:
-- `tableStyles` — tabla, encabezados, filas, celdas
-- `formStyles` — tarjeta de formulario, grilla, inputs, selects, textareas
-- `buttonStyles` — botones primario, secundario, editar, eliminar, activar
-- `badgeStyles` — badges de estado activo e inactivo
-- `pageStyles` — encabezado de página, título, mensaje de error
-
-Cada página los combina así:
+## 6.2 URL de API dinámica
+`services/api.js` usa `REACT_APP_API_URL` si está definida, o `localhost:3000/api` por defecto:
 ```js
-const styles = { ...tableStyles, ...formStyles, ...buttonStyles, ...badgeStyles, ...pageStyles };
+baseURL: process.env.REACT_APP_API_URL || 'http://localhost:3000/api'
 ```
 
-## 6.3 Servicio de API
-`services/api.js` centraliza todas las llamadas HTTP con dos interceptores:
-- **Request**: agrega el token JWT al header `Authorization`
-- **Response**: redirige al login si el servidor retorna 401 o 403
-
-## 6.4 Rutas del frontend
-
-| Ruta | Componente | Descripción |
-|------|-----------|-------------|
-| / | → /dashboard | Redirección automática |
-| /dashboard | Dashboard | Resumen financiero |
-| /trips | Trips | Historial y registro de viajes |
-| /expenses | Expenses | Registro de gastos |
-| /vehicles | Vehicles | Gestión de vehículos |
-| /employees | Employees | Gestión de empleados |
-| /clients | Clients | Gestión de clientes |
+## 6.3 Sistema de estilos compartidos
+`styles/common.js` exporta cinco objetos: `tableStyles`, `formStyles`, `buttonStyles`, `badgeStyles`, `pageStyles`. Cada página los combina con spread operator para evitar duplicación.
 
 ---
 
-# 7. Flujo de funcionamiento
+# 7. Despliegue
 
-1. Usuario inicia sesión — backend valida y retorna JWT
-2. Frontend almacena el token y muestra el dashboard
-3. Usuario registra clientes, vehículos y empleados
-4. Usuario registra viajes asociando vehículo, conductor y cliente
-5. Sistema asigna automáticamente el estado "Pending billing"
-6. Usuario registra gastos asociados a los viajes
-7. Sistema calcula gastos totales y ganancia en cada viaje
-8. Usuario actualiza el estado del viaje conforme avanza la facturación
-9. Dashboard muestra el resumen financiero actualizado
+## 7.1 Variables de entorno
+
+### Backend (Railway)
+```
+DATABASE_URL=<generada por Railway>
+JWT_SECRET=<secreto seguro>
+OWNER_ID=1
+NODE_ENV=production
+FRONTEND_URL=https://sistema-de-gestion-de-transporte-6g.vercel.app
+```
+
+### Frontend (Vercel)
+```
+REACT_APP_API_URL=https://inspiring-friendship-production-b55f.up.railway.app/api
+CI=false
+```
+
+## 7.2 Proceso de actualización
+```bash
+git add .
+git commit -m "Descripción del cambio"
+git push
+```
+Railway y Vercel despliegan automáticamente al detectar el push en `main`.
+
+## 7.3 Backup de base de datos
+```bash
+# Backup manual
+pg_dump -h localhost -U postgres heavy_transport > backup_$(date +%Y%m%d).sql
+
+# Restaurar en Railway
+psql "postgresql://user:pass@host:port/railway" < backup.sql
+```
 
 ---
 
 # 8. Seguridad
 
-- Contraseñas almacenadas con hash bcrypt (10 salt rounds)
-- Autenticación JWT con expiración de 8 horas
-- Todas las queries usan parámetros preparados (anti SQL injection)
-- CORS habilitado para comunicación frontend-backend local
-- El endpoint `/api/auth/setup-password` debe eliminarse antes de producción
-- HTTPS pendiente para versión de producción
+- Contraseñas con hash bcrypt (10 salt rounds)
+- JWT con expiración de 8 horas
+- Queries parametrizadas (anti SQL injection)
+- CORS restringido al dominio del frontend
+- HTTPS en producción (Railway y Vercel lo proveen automáticamente)
+- El endpoint `/setup-password` debe eliminarse en versiones futuras
 
 ---
 
-# 9. Despliegue
-
-## 9.1 Entorno local (actual)
-- Backend en Ubuntu WSL2, puerto 3000
-- Frontend en Ubuntu WSL2, puerto 3001
-- PostgreSQL en contenedor Docker, puerto 5432
-- Datos persistidos en volumen Docker `heavy_transport_data`
-
-## 9.2 Comandos de inicio diario
-```bash
-docker start heavy-transport-db
-cd ~/proyectos/heavy-transport/backend && npm run dev
-cd ~/proyectos/heavy-transport/frontend && npm start
-```
-
-## 9.3 Entorno producción (futuro)
-- Frontend en Vercel o similar
-- Backend en Railway o similar
-- Base de datos PostgreSQL gestionada en la nube
-- Variables de entorno configuradas en el servidor
-- Eliminación del endpoint setup-password
-- HTTPS habilitado
-
----
-
-# 10. Decisiones técnicas destacadas
+# 9. Decisiones técnicas destacadas
 
 | Decisión | Justificación |
 |----------|--------------|
-| Soft delete en todas las entidades | Preservar historial de operaciones |
+| Soft delete en todas las entidades | Preservar historial operativo |
 | Triggers para defaults y validaciones | PostgreSQL no permite subqueries en DEFAULT ni CHECK |
-| OWNER_ID constante en versión local | Simplifica queries durante período de prueba |
-| Estilos en common.js | Evita duplicación y facilita cambios globales de diseño |
-| axios interceptors | Manejo centralizado del JWT sin repetir código |
-| Gastos sin asociación obligatoria | Refleja la realidad del negocio (repuestos de bodega) |
+| OWNER_ID constante | Simplifica queries en modelo single-user |
+| DATABASE_URL con SSL en producción | Requerimiento de Railway para conexiones externas |
+| CI=false en Vercel | create-react-app genera warnings que Vercel trata como errores |
+| Estilos en common.js | Evita duplicación y facilita cambios globales |
+| Gastos sin asociación obligatoria | Refleja realidad del negocio (repuestos de bodega) |
 
 ---
 
-# 11. Plan de mejoras futuras
+# 10. Plan de mejoras futuras
 
-- Gráficos de ingresos y gastos por mes (Chart.js o Recharts)
+- Gráficos de ingresos y gastos por mes
 - Facturación electrónica con Ministerio de Hacienda
 - Exportación a Excel y PDF
 - Control de mantenimiento de vehículos con alertas
-- Multiusuario con roles (admin, conductor, contador)
+- Multiusuario con roles
 - Notificaciones de vencimiento de revisión técnica
-- Despliegue en servidor cloud
 
 ---
 
-# 12. Conclusión
+# 11. Conclusión
 
-El sistema implementa una arquitectura full-stack completa con React, Node.js y PostgreSQL, cubriendo todas las necesidades operativas identificadas para la empresa de transporte. La versión local constituye una base sólida para el período de prueba, con una arquitectura diseñada para escalar hacia producción sin cambios estructurales mayores.
+El sistema implementa una arquitectura full-stack completa con React, Node.js y PostgreSQL, desplegada en producción en Vercel y Railway. Cubre todas las necesidades operativas identificadas para la empresa de transporte y tiene una base sólida para escalar con nuevas funcionalidades.

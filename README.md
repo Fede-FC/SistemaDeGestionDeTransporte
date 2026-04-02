@@ -1,5 +1,17 @@
 # Sistema de Gestión de Transporte de Carga
 
+
+![Heavy Transport](https://img.shields.io/badge/Estado-En%20Producción-brightgreen)
+![Version](https://img.shields.io/badge/Versión-1.0.0-blue)
+![License](https://img.shields.io/badge/Licencia-MIT-yellow)
+
+## 🌐 Demo en producción
+
+**Frontend:** https://sistema-de-gestion-de-transporte-6g.vercel.app
+**Backend API:** https://inspiring-friendship-production-b55f.up.railway.app
+
+---
+
 ## 📌 Descripción del proyecto
 
 Sistema web para la **gestión de viajes, gastos y vehículos** de una empresa familiar dedicada al transporte de carga pesada. Centraliza la información operativa en una base de datos, facilitando el registro, consulta y análisis de las operaciones.
@@ -21,16 +33,6 @@ Desarrollar una aplicación que permita **gestionar de forma digital los viajes,
 
 ---
 
-## 👤 Usuarios del sistema
-
-**Administrador**
-- Registra viajes y gastos
-- Gestiona vehículos, empleados y clientes
-- Consulta historial con filtros
-- Visualiza dashboard con resumen financiero
-
----
-
 ## 💻 Tecnologías utilizadas
 
 | Capa | Tecnología |
@@ -38,23 +40,23 @@ Desarrollar una aplicación que permita **gestionar de forma digital los viajes,
 | Frontend | React 18 + React Router + Axios |
 | Backend | Node.js v24 + Express |
 | Base de datos | PostgreSQL 16 |
-| Contenedor DB | Docker Desktop |
-| Autenticación | JWT (jsonwebtoken) + bcrypt |
+| Hosting Frontend | Vercel |
+| Hosting Backend | Railway |
+| Autenticación | JWT + bcrypt |
 | Entorno de desarrollo | Ubuntu WSL2 en Windows |
-| Editor | VS Code |
 
 ---
 
 ## 🏗️ Arquitectura del sistema
 
 ```
-Frontend React (localhost:3001)
+Frontend React (Vercel)
 │  axios + JWT interceptors
 │
-Backend Express API (localhost:3000)
+Backend Express API (Railway)
 │  controllers → routes → middleware
 │
-PostgreSQL en Docker (localhost:5432)
+PostgreSQL (Railway)
 │  triggers + índices
 ```
 
@@ -72,7 +74,6 @@ PostgreSQL en Docker (localhost:5432)
 ### 1. Levantar la base de datos
 
 ```bash
-# Crear contenedor PostgreSQL
 docker run --name heavy-transport-db \
   -e POSTGRES_PASSWORD=TU_PASSWORD \
   -e POSTGRES_DB=heavy_transport \
@@ -80,12 +81,10 @@ docker run --name heavy-transport-db \
   -v heavy_transport_data:/var/lib/postgresql/data \
   -d postgres:16
 
-# Instalar cliente PostgreSQL en Ubuntu
 sudo apt install postgresql-client -y
 
-# Cargar el esquema
 psql -h localhost -U postgres \
-  -f ~/proyectos/heavy-transport/database/HeavyTransport_v2.sql
+  -f ~/proyectos/heavy-transport/database/HeavyTransport.sql
 ```
 
 ### 2. Configurar el backend
@@ -105,6 +104,7 @@ DB_PASSWORD=TU_PASSWORD
 PORT=3000
 OWNER_ID=1
 JWT_SECRET=heavy_transport_secret_local_2024
+FRONTEND_URL=http://localhost:3001
 ```
 
 Configurar contraseña del admin (solo la primera vez):
@@ -123,12 +123,40 @@ npm run dev
 
 ```bash
 cd ~/proyectos/heavy-transport/frontend
-npm install
+npm install --legacy-peer-deps
 echo "PORT=3001" > .env
+echo "REACT_APP_API_URL=http://localhost:3000/api" >> .env
 npm start
 ```
 
-Acceder en el navegador: `http://localhost:3001`
+Acceder en: `http://localhost:3001`
+
+---
+
+## ☁️ Despliegue en producción
+
+### Variables de entorno en Railway (backend)
+```
+DATABASE_URL=<generada automáticamente por Railway>
+JWT_SECRET=<secreto seguro>
+OWNER_ID=1
+NODE_ENV=production
+FRONTEND_URL=https://tu-app.vercel.app
+```
+
+### Variables de entorno en Vercel (frontend)
+```
+REACT_APP_API_URL=https://tu-backend.up.railway.app/api
+CI=false
+```
+
+### Actualizar el sistema en producción
+```bash
+git add .
+git commit -m "Descripción del cambio"
+git push
+```
+Railway y Vercel despliegan automáticamente al detectar el push.
 
 ---
 
@@ -137,7 +165,7 @@ Acceder en el navegador: `http://localhost:3001`
 ```
 heavy-transport/
 ├── database/
-│   └── HeavyTransport_v2.sql
+│   └── HeavyTransport.sql
 ├── backend/
 │   ├── config/
 │   │   └── db.js
@@ -186,18 +214,19 @@ heavy-transport/
 - Redirección automática al login cuando el token expira
 
 ### Dashboard
-- Total de viajes registrados
-- Ingresos, gastos y ganancia total
-- Tabla de los últimos 5 viajes
+- Filtros por semana, mes, año y período personalizado
+- Total de viajes, ingresos, gastos y ganancia del período
+- Tabla de los últimos 5 viajes del período
 
 ### Viajes
 - Registro completo: fecha, vehículo, conductor, cliente, origen, destino
 - Campos de contenedor: número de contenedor, DUA, tamaño del equipo, peso
 - Tipo de operación: importación, exportación, nacional
 - Número de factura y descripción
-- Estado del flujo de facturación (Pending billing → Invoice paid)
+- Estado del flujo de facturación
 - Filtros por fecha, vehículo y cliente
-- Cálculo automático de gastos totales y ganancia por viaje
+- Búsqueda por número de contenedor
+- Cálculo automático de gastos totales y ganancia
 
 ### Gastos
 - Tipos: combustible, peajes, mantenimiento, reparaciones, otro
@@ -205,30 +234,17 @@ heavy-transport/
 - Gastos sin asociación permitidos (repuestos de bodega)
 - Filtros por viaje y vehículo
 
-### Vehículos
-- Registro: placa, marca, modelo, año
+### Vehículos, Empleados y Clientes
+- CRUD completo
 - Soft delete — desactivar y reactivar sin perder datos
-
-### Empleados
-- Registro: cédula, nombre, fecha de contratación, fecha de salida
-- Soft delete — desactivar y reactivar
-
-### Clientes
-- Registro: nombre y contacto
-- Soft delete — desactivar y reactivar
 
 ---
 
-## 🔄 Comandos de inicio diario
+## 🔄 Comandos de inicio diario (entorno local)
 
 ```bash
-# 1. Iniciar contenedor de base de datos
 docker start heavy-transport-db
-
-# 2. Iniciar backend (terminal 1)
 cd ~/proyectos/heavy-transport/backend && npm run dev
-
-# 3. Iniciar frontend (terminal 2)
 cd ~/proyectos/heavy-transport/frontend && npm start
 ```
 
@@ -242,7 +258,6 @@ cd ~/proyectos/heavy-transport/frontend && npm start
 - Control de mantenimiento de vehículos
 - Multiusuario con roles
 - Notificaciones de vencimiento de revisión técnica
-- Despliegue en servidor cloud
 
 ---
 
