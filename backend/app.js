@@ -5,7 +5,22 @@ require('dotenv').config();
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+// En producción solo acepta requests del frontend desplegado
+const allowedOrigins = [
+  'http://localhost:3001',
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('No permitido por CORS'));
+    }
+  }
+}));
+
 app.use(express.json());
 
 app.use('/api/auth',      require('./routes/authRoutes'));
