@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import api from '../services/api';
+import { formStyles, buttonStyles, pageStyles } from '../styles/common';
 
 function Login({ onLogin }) {
   const [username, setUsername] = useState('');
@@ -12,22 +13,28 @@ function Login({ onLogin }) {
     setLoading(true);
     setError('');
     try {
-      const res = await api.post('/auth/login', { username, password });
+      const res = await api.post('/auth/login', {
+        username: username.trim(),
+        password: password.trim()
+      });
       localStorage.setItem('token', res.data.token);
       onLogin();
     } catch (err) {
       setError('Usuario o contraseña incorrectos');
+      setPassword('');
     } finally {
       setLoading(false);
     }
   };
 
+  const styles = { ...formStyles, ...buttonStyles, ...pageStyles };
+
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
-        <h2 style={styles.title}>Heavy Transport</h2>
-        <p style={styles.subtitle}>Sistema de Gestión</p>
-        {error && <p style={styles.error}>{error}</p>}
+    <div style={loginStyles.container}>
+      <div style={loginStyles.card}>
+        <h2 style={loginStyles.title}>Heavy Transport</h2>
+        <p style={loginStyles.subtitle}>Sistema de Gestión</p>
+        {error && <p style={{ color: '#d32f2f', fontSize: '0.875rem', marginBottom: '1rem' }}>{error}</p>}
         <form onSubmit={handleSubmit}>
           <div style={styles.field}>
             <label style={styles.label}>Usuario</label>
@@ -49,7 +56,7 @@ function Login({ onLogin }) {
               required
             />
           </div>
-          <button style={styles.button} type="submit" disabled={loading}>
+          <button style={loginStyles.button} type="submit" disabled={loading}>
             {loading ? 'Ingresando...' : 'Ingresar'}
           </button>
         </form>
@@ -58,7 +65,7 @@ function Login({ onLogin }) {
   );
 }
 
-const styles = {
+const loginStyles = {
   container: {
     display: 'flex', justifyContent: 'center',
     alignItems: 'center', height: '100vh',
@@ -71,14 +78,6 @@ const styles = {
   },
   title:    { margin: 0, fontSize: '1.5rem', color: '#1a1a2e' },
   subtitle: { color: '#666', marginBottom: '1.5rem', marginTop: '0.25rem' },
-  error:    { color: '#d32f2f', fontSize: '0.875rem', marginBottom: '1rem' },
-  field:    { marginBottom: '1rem' },
-  label:    { display: 'block', marginBottom: '0.25rem', fontSize: '0.875rem', color: '#333' },
-  input: {
-    width: '100%', padding: '0.5rem',
-    border: '1px solid #ddd', borderRadius: '4px',
-    fontSize: '1rem', boxSizing: 'border-box'
-  },
   button: {
     width: '100%', padding: '0.75rem',
     backgroundColor: '#1a1a2e', color: 'white',
