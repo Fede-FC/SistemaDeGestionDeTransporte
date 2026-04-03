@@ -1,6 +1,8 @@
-const express = require('express');
-const router = express.Router();
+const express     = require('express');
+const router      = express.Router();
+const verifyToken = require('../middleware/auth');
 const { getExpenses, createExpense, updateExpense, deleteExpense } = require('../controllers/expenseController');
+router.use(verifyToken);
 router.get('/',       getExpenses);
 router.post('/',      createExpense);
 router.put('/:id',    updateExpense);

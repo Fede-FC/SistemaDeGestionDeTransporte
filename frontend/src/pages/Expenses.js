@@ -257,5 +257,5 @@ function Expenses() {
     </div>
   );
 }
-
+// FC: esta pagina va a estar llena, puro gasto
 export default Expenses;

@@ -1,6 +1,8 @@
-const express = require('express');
-const router = express.Router();
+const express     = require('express');
+const router      = express.Router();
+const verifyToken = require('../middleware/auth');
 const { getClients, getClientById, createClient, updateClient, deleteClient } = require('../controllers/clientController');
+router.use(verifyToken);
 router.get('/',       getClients);
 router.get('/:id',    getClientById);
 router.post('/',      createClient);

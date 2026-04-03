@@ -1,6 +1,4 @@
 const pool = require('../config/db');
-require('dotenv').config();
-const OWNER_ID = parseInt(process.env.OWNER_ID);
 
 const getTrips = async (req, res) => {
   try {
@@ -21,7 +19,7 @@ const getTrips = async (req, res) => {
       LEFT JOIN expenses ex ON ex.tripid = t.tripid
       WHERE t.userid = $1
     `;
-    const params = [OWNER_ID];
+    const params = [req.user.userid];
     let i = 2;
 
     if (from)      { query += ` AND t.trip_date >= $${i++}`; params.push(from); }
@@ -31,8 +29,7 @@ const getTrips = async (req, res) => {
     if (driverid)  { query += ` AND t.driverid  = $${i++}`; params.push(driverid); }
 
     query += ` GROUP BY t.tripid, v.plate, v.brand, v.model,
-               e.fullname, c.name, ts.name
-               ORDER BY t.trip_date DESC`;
+               e.fullname, c.name, ts.name ORDER BY t.trip_date DESC`;
 
     const result = await pool.query(query, params);
     res.json(result.rows);
@@ -45,11 +42,8 @@ const getTripById = async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(
-      `SELECT t.*,
-        v.plate, v.brand, v.model,
-        e.fullname AS driver_name,
-        c.name AS client_name,
-        ts.name AS state_name,
+      `SELECT t.*, v.plate, v.brand, v.model,
+        e.fullname AS driver_name, c.name AS client_name, ts.name AS state_name,
         COALESCE(SUM(ex.amount), 0) AS total_expenses,
         t.payment_received - COALESCE(SUM(ex.amount), 0) AS profit
        FROM trips t
@@ -59,9 +53,8 @@ const getTripById = async (req, res) => {
        JOIN trip_states ts ON t.stateid  = ts.stateid
        LEFT JOIN expenses ex ON ex.tripid = t.tripid
        WHERE t.tripid = $1 AND t.userid = $2
-       GROUP BY t.tripid, v.plate, v.brand, v.model,
-                e.fullname, c.name, ts.name`,
-      [id, OWNER_ID]
+       GROUP BY t.tripid, v.plate, v.brand, v.model, e.fullname, c.name, ts.name`,
+      [id, req.user.userid]
     );
     if (result.rows.length === 0)
       return res.status(404).json({ error: 'Viaje no encontrado' });
@@ -80,19 +73,14 @@ const createTrip = async (req, res) => {
     } = req.body;
     const result = await pool.query(
       `INSERT INTO trips
-        (trip_date, vehicleid, driverid, origin, destination,
-         clientid, payment_received, container_number, invoice_number,
-         description, dua_number, equipment_size, weight, operation_type, userid)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-       RETURNING *`,
-      [
-        trip_date, vehicleid, driverid, origin, destination,
-        clientid, payment_received || 0,
-        container_number || null, invoice_number || null,
-        description || null, dua_number || null,
-        equipment_size || null, weight || null,
-        operation_type || null, OWNER_ID
-      ]
+        (trip_date, vehicleid, driverid, origin, destination, clientid,
+         payment_received, container_number, invoice_number, description,
+         dua_number, equipment_size, weight, operation_type, userid)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+      [trip_date, vehicleid, driverid, origin, destination, clientid,
+       payment_received || 0, container_number || null, invoice_number || null,
+       description || null, dua_number || null, equipment_size || null,
+       weight || null, operation_type || null, req.user.userid]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -104,26 +92,20 @@ const updateTrip = async (req, res) => {
   try {
     const { id } = req.params;
     const {
-      trip_date, vehicleid, driverid, origin, destination,
-      clientid, payment_received, container_number, invoice_number,
-      description, stateid, dua_number, equipment_size, weight, operation_type
+      trip_date, vehicleid, driverid, origin, destination, clientid,
+      payment_received, container_number, invoice_number, description,
+      stateid, dua_number, equipment_size, weight, operation_type
     } = req.body;
     const result = await pool.query(
-      `UPDATE trips SET
-        trip_date=$1, vehicleid=$2, driverid=$3, origin=$4,
-        destination=$5, clientid=$6, payment_received=$7,
-        container_number=$8, invoice_number=$9, description=$10,
-        stateid=$11, dua_number=$12, equipment_size=$13,
-        weight=$14, operation_type=$15, updated_at=CURRENT_TIMESTAMP
+      `UPDATE trips SET trip_date=$1, vehicleid=$2, driverid=$3, origin=$4,
+        destination=$5, clientid=$6, payment_received=$7, container_number=$8,
+        invoice_number=$9, description=$10, stateid=$11, dua_number=$12,
+        equipment_size=$13, weight=$14, operation_type=$15, updated_at=CURRENT_TIMESTAMP
        WHERE tripid=$16 AND userid=$17 RETURNING *`,
-      [
-        trip_date, vehicleid, driverid, origin, destination,
-        clientid, payment_received, container_number || null,
-        invoice_number || null, description || null, stateid,
-        dua_number || null, equipment_size || null,
-        weight || null, operation_type || null,
-        id, OWNER_ID
-      ]
+      [trip_date, vehicleid, driverid, origin, destination, clientid,
+       payment_received, container_number || null, invoice_number || null,
+       description || null, stateid, dua_number || null, equipment_size || null,
+       weight || null, operation_type || null, id, req.user.userid]
     );
     if (result.rows.length === 0)
       return res.status(404).json({ error: 'Viaje no encontrado' });
@@ -138,7 +120,7 @@ const deleteTrip = async (req, res) => {
     const { id } = req.params;
     await pool.query(
       `DELETE FROM trips WHERE tripid = $1 AND userid = $2`,
-      [id, OWNER_ID]
+      [id, req.user.userid]
     );
     res.json({ message: 'Viaje eliminado' });
   } catch (err) {

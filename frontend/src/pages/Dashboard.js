@@ -186,5 +186,5 @@ const filter = {
   custom:    { display: 'flex', gap: '0.5rem', alignItems: 'center' },
   input:     { padding: '0.4rem 0.5rem', border: '1px solid #ddd', borderRadius: '4px', fontSize: '0.875rem' },
 };
-
+// FC: Esta pagina funciona con la voluntad de Dios y a pura IA
 export default Dashboard;
