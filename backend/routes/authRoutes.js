@@ -1,7 +1,6 @@
 const express = require('express');
 const router  = express.Router();
-const { login, setupPassword } = require('../controllers/authController');
+const { login } = require('../controllers/authController');
 
-router.post('/login',          login);
-router.post('/setup-password', setupPassword); // Solo para setup inicial
+router.post('/login', login);
 module.exports = router;

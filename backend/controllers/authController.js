@@ -1,6 +1,6 @@
-const pool    = require('../config/db');
-const bcrypt  = require('bcrypt');
-const jwt     = require('jsonwebtoken');
+const pool   = require('../config/db');
+const bcrypt = require('bcrypt');
+const jwt    = require('jsonwebtoken');
 require('dotenv').config();
 
 const login = async (req, res) => {
@@ -33,19 +33,4 @@ const login = async (req, res) => {
   }
 };
 
-// Solo para setup inicial local — crear contraseña hasheada
-const setupPassword = async (req, res) => {
-  try {
-    const { password } = req.body;
-    const hash = await bcrypt.hash(password, 10);
-    await pool.query(
-      `UPDATE users SET password_hash = $1 WHERE userid = 1`,
-      [hash]
-    );
-    res.json({ message: 'Contraseña configurada correctamente' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-module.exports = { login, setupPassword };
+module.exports = { login };

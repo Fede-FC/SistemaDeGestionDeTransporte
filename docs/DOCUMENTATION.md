@@ -16,7 +16,7 @@ El sistema digitaliza el proceso administrativo de una empresa de transporte de 
 | Servicio | URL |
 |---------|-----|
 | Frontend | https://sistema-de-gestion-de-transporte-6g.vercel.app |
-| Backend API | https://inspiring-friendship-production-b55f.up.railway.app |
+| Backend API | https://heavy-transport-api.fly.dev |
 | Repositorio | https://github.com/Fede-FC/SistemaDeGestionDeTransporte |
 
 ## 1.4 Definiciones y términos
@@ -36,7 +36,7 @@ El sistema digitaliza el proceso administrativo de una empresa de transporte de 
 # 2. Descripción general del sistema
 
 ## 2.1 Perspectiva del sistema
-Aplicación web de tres capas desplegada en la nube: frontend React en Vercel, API backend Node.js/Express en Railway, y base de datos PostgreSQL en Railway.
+Aplicación web de tres capas desplegada en la nube: frontend React en Vercel, API backend Node.js/Express en Fly.io (contenedor Docker), y base de datos PostgreSQL en Fly.io.
 
 ## 2.2 Funciones principales
 - Autenticación segura con JWT
@@ -66,11 +66,11 @@ Frontend React — Vercel
 │  axios con interceptores JWT
 │  react-router-dom para navegación
 │
-Backend Express API — Railway
+Backend Express API — Fly.io (Docker)
 │  middleware verifyToken
 │  controllers con queries parametrizadas
 │
-PostgreSQL — Railway
+PostgreSQL — Fly.io (Fly Postgres)
 │  triggers de validación
 │  índices para rendimiento
 ```
@@ -87,8 +87,8 @@ PostgreSQL — Railway
 
 | Entorno | Frontend | Backend | Base de datos |
 |---------|---------|---------|--------------|
-| Local | localhost:3001 | localhost:3000 | Docker :5432 |
-| Producción | Vercel | Railway | Railway PostgreSQL |
+| Local | localhost:3001 | localhost:3000 | PostgreSQL local :5432 |
+| Producción | Vercel | Fly.io (Docker) | Fly Postgres |
 
 ## 3.4 CORS
 El backend acepta requests únicamente desde los orígenes configurados en la variable `FRONTEND_URL`. En producción apunta al dominio de Vercel. En desarrollo acepta `localhost:3001`.
@@ -200,17 +200,20 @@ CREATE INDEX idx_expenses_vehicle ON expenses(vehicleid);
 ```
 backend/
 ├── config/
-│   └── db.js       ← Pool pg, soporta DATABASE_URL (Railway) y variables separadas (local)
-├── controllers/    ← Lógica de negocio y queries
+│   └── db.js           ← Pool pg, soporta DATABASE_URL (Fly.io) y variables separadas (local)
+├── controllers/         ← Lógica de negocio y queries
 ├── middleware/
-│   └── auth.js     ← Verificación JWT
-├── routes/         ← Definición de endpoints
-└── app.js          ← Express + CORS + registro de rutas
+│   └── auth.js         ← Verificación JWT
+├── routes/              ← Definición de endpoints
+├── Dockerfile           ← Imagen Docker para Fly.io
+├── fly.toml             ← Configuración de Fly.io
+├── .env.example         ← Variables de entorno requeridas
+└── app.js               ← Express + CORS + registro de rutas
 ```
 
 ## 5.2 Conexión a base de datos
 `config/db.js` detecta automáticamente el entorno:
-- **Producción (Railway)**: usa `DATABASE_URL` con SSL habilitado
+- **Producción (Fly.io)**: usa `DATABASE_URL` con SSL habilitado (Fly Postgres la inyecta automáticamente al adjuntar la base de datos)
 - **Local**: usa variables separadas `DB_HOST`, `DB_PORT`, etc.
 
 ## 5.3 Endpoints completos
@@ -219,7 +222,6 @@ backend/
 | Método | Ruta | Descripción |
 |--------|------|-------------|
 | POST | /login | Iniciar sesión, retorna JWT |
-| POST | /setup-password | Configurar contraseña (solo setup) |
 
 ### Vehículos — `/api/vehicles`
 | Método | Ruta | Descripción |
@@ -308,36 +310,62 @@ baseURL: process.env.REACT_APP_API_URL || 'http://localhost:3000/api'
 
 ## 7.1 Variables de entorno
 
-### Backend (Railway)
+### Backend (Fly.io)
 ```
-DATABASE_URL=<generada por Railway>
-JWT_SECRET=<secreto seguro>
-OWNER_ID=1
+DATABASE_URL=<inyectada automáticamente por fly postgres attach>
+JWT_SECRET=<secreto seguro de al menos 32 caracteres>
 NODE_ENV=production
 FRONTEND_URL=https://sistema-de-gestion-de-transporte-6g.vercel.app
 ```
 
 ### Frontend (Vercel)
 ```
-REACT_APP_API_URL=https://inspiring-friendship-production-b55f.up.railway.app/api
+REACT_APP_API_URL=https://heavy-transport-api.fly.dev/api
 CI=false
 ```
 
-## 7.2 Proceso de actualización
+## 7.2 Primer despliegue en Fly.io
+
+```bash
+# 1. Instalar flyctl
+curl -L https://fly.io/install.sh | sh
+
+# 2. Autenticarse
+flyctl auth login
+
+# 3. Desde /backend, crear la app (usa fly.toml existente)
+flyctl launch --no-deploy
+
+# 4. Crear base de datos Fly Postgres
+flyctl postgres create --name heavy-transport-db --region mia
+
+# 5. Adjuntar la BD a la app (inyecta DATABASE_URL automáticamente)
+flyctl postgres attach heavy-transport-db
+
+# 6. Configurar variables de entorno
+flyctl secrets set JWT_SECRET=<secreto_seguro>
+flyctl secrets set FRONTEND_URL=https://sistema-de-gestion-de-transporte-6g.vercel.app
+
+# 7. Desplegar
+flyctl deploy
+```
+
+## 7.3 Proceso de actualización
 ```bash
 git add .
 git commit -m "Descripción del cambio"
 git push
 ```
-Railway y Vercel despliegan automáticamente al detectar el push en `main`.
+Vercel despliega el frontend automáticamente. Para el backend, ejecutar `flyctl deploy` desde `/backend`, o configurar un GitHub Action para deploy automático.
 
-## 7.3 Backup de base de datos
+## 7.4 Backup de base de datos
 ```bash
-# Backup manual
-pg_dump -h localhost -U postgres heavy_transport > backup_$(date +%Y%m%d).sql
+# Backup desde Fly Postgres
+flyctl postgres connect -a heavy-transport-db
+pg_dump heavy_transport > backup_$(date +%Y%m%d).sql
 
-# Restaurar en Railway
-psql "postgresql://user:pass@host:port/railway" < backup.sql
+# Restaurar
+flyctl postgres connect -a heavy-transport-db < backup.sql
 ```
 
 ---
@@ -348,8 +376,24 @@ psql "postgresql://user:pass@host:port/railway" < backup.sql
 - JWT con expiración de 8 horas
 - Queries parametrizadas (anti SQL injection)
 - CORS restringido al dominio del frontend
-- HTTPS en producción (Railway y Vercel lo proveen automáticamente)
-- El endpoint `/setup-password` debe eliminarse en versiones futuras
+- HTTPS en producción (Fly.io y Vercel lo proveen automáticamente)
+- El endpoint `/setup-password` fue eliminado — para cambiar contraseñas usar el script local `scripts/hash-password.js` (ver sección 8.1)
+
+## 8.1 Cambio de contraseña de usuario
+
+Sin el endpoint `/setup-password`, el cambio de contraseña se realiza localmente con el siguiente script:
+
+```js
+// Ejecutar una vez: node scripts/hash-password.js
+const bcrypt = require('bcrypt');
+const { Pool } = require('pg');
+require('dotenv').config();
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const hash = await bcrypt.hash('NUEVA_CONTRASEÑA', 10);
+await pool.query('UPDATE users SET password_hash = $1 WHERE username = $2', [hash, 'admin']);
+pool.end();
+```
 
 ---
 
@@ -359,8 +403,9 @@ psql "postgresql://user:pass@host:port/railway" < backup.sql
 |----------|--------------|
 | Soft delete en todas las entidades | Preservar historial operativo |
 | Triggers para defaults y validaciones | PostgreSQL no permite subqueries en DEFAULT ni CHECK |
-| OWNER_ID constante | Simplifica queries en modelo single-user |
-| DATABASE_URL con SSL en producción | Requerimiento de Railway para conexiones externas |
+| DATABASE_URL con SSL en producción | Requerimiento de Fly Postgres para conexiones externas |
+| Dockerfile con node:20-alpine | Imagen mínima (~50MB) para deploy rápido en Fly.io |
+| fly.toml con auto_stop_machines | Máquina se detiene cuando no hay tráfico (ahorra créditos) |
 | CI=false en Vercel | create-react-app genera warnings que Vercel trata como errores |
 | Estilos en common.js | Evita duplicación y facilita cambios globales |
 | Gastos sin asociación obligatoria | Refleja realidad del negocio (repuestos de bodega) |
@@ -380,4 +425,4 @@ psql "postgresql://user:pass@host:port/railway" < backup.sql
 
 # 11. Conclusión
 
-El sistema implementa una arquitectura full-stack completa con React, Node.js y PostgreSQL, desplegada en producción en Vercel y Railway. Cubre todas las necesidades operativas identificadas para la empresa de transporte y tiene una base sólida para escalar con nuevas funcionalidades.
+El sistema implementa una arquitectura full-stack completa con React, Node.js y PostgreSQL, desplegada en producción en Vercel (frontend) y Fly.io (backend + BD). Cubre todas las necesidades operativas identificadas para la empresa de transporte y tiene una base sólida para escalar con nuevas funcionalidades.
