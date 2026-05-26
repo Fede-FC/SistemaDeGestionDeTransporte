@@ -67,8 +67,9 @@ function Expenses() {
       setEditing(null);
       setForm(emptyForm);
       fetchAll();
-    } catch {
-      setError('Error al guardar gasto');
+    } catch (err) {
+      const d = err.response?.data;
+      setError(d?.errors ? d.errors.join(' | ') : d?.error || 'Error al guardar gasto');
     }
   };
 

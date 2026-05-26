@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { validatePositiveAmount, validateExpenseType, collectErrors } = require('../middleware/validators');
 
 const getExpenses = async (req, res) => {
   try {
@@ -19,11 +20,19 @@ const getExpenses = async (req, res) => {
 const createExpense = async (req, res) => {
   try {
     const { expense_type, amount, description, tripid, vehicleid, expense_date } = req.body;
+
+    // RF-08: Restricciones de negocio
+    const errors = collectErrors([
+      validateExpenseType(expense_type),
+      validatePositiveAmount(amount, 'El monto del gasto'),
+    ]);
+    if (errors.length) return res.status(400).json({ errors });
+
     const result = await pool.query(
       `INSERT INTO expenses
         (expense_type, amount, description, tripid, vehicleid, userid, expense_date)
        VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [expense_type, amount, description || null,
+      [expense_type, parseFloat(amount), description || null,
        tripid || null, vehicleid || null, req.user.userid,
        expense_date || new Date()]
     );
@@ -37,11 +46,19 @@ const updateExpense = async (req, res) => {
   try {
     const { id } = req.params;
     const { expense_type, amount, description, tripid, vehicleid, expense_date } = req.body;
+
+    // RF-08: Validar al editar
+    const errors = collectErrors([
+      validateExpenseType(expense_type),
+      validatePositiveAmount(amount, 'El monto del gasto'),
+    ]);
+    if (errors.length) return res.status(400).json({ errors });
+
     const result = await pool.query(
       `UPDATE expenses SET expense_type=$1, amount=$2, description=$3,
         tripid=$4, vehicleid=$5, expense_date=$6, updated_at=CURRENT_TIMESTAMP
        WHERE expenseid=$7 AND userid=$8 RETURNING *`,
-      [expense_type, amount, description || null,
+      [expense_type, parseFloat(amount), description || null,
        tripid || null, vehicleid || null, expense_date,
        id, req.user.userid]
     );

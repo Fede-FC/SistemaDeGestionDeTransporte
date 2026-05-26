@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { validateClientName, validateEmail, collectErrors } = require('../middleware/validators');
 
 const getClients = async (req, res) => {
   try {
@@ -29,11 +30,19 @@ const getClientById = async (req, res) => {
 
 const createClient = async (req, res) => {
   try {
-    const { name, contact } = req.body;
+    const { name, contact, email, phone } = req.body;
+
+    // RF-05: Restricciones de negocio
+    const errors = collectErrors([
+      validateClientName(name),
+      validateEmail(email),
+    ]);
+    if (errors.length) return res.status(400).json({ errors });
+
     const result = await pool.query(
       `INSERT INTO clients (name, contact, userid)
        VALUES ($1, $2, $3) RETURNING *`,
-      [name, contact || null, req.user.userid]
+      [name.trim(), contact || null, req.user.userid]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -44,11 +53,19 @@ const createClient = async (req, res) => {
 const updateClient = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, contact, active } = req.body;
+    const { name, contact, email, active } = req.body;
+
+    // RF-05: Validar al editar
+    const errors = collectErrors([
+      validateClientName(name),
+      validateEmail(email),
+    ]);
+    if (errors.length) return res.status(400).json({ errors });
+
     const result = await pool.query(
       `UPDATE clients SET name=$1, contact=$2, active=$3, updated_at=CURRENT_TIMESTAMP
        WHERE clientid=$4 AND userid=$5 RETURNING *`,
-      [name, contact || null, active !== undefined ? active : true, id, req.user.userid]
+      [name.trim(), contact || null, active !== undefined ? active : true, id, req.user.userid]
     );
     if (result.rows.length === 0)
       return res.status(404).json({ error: 'Cliente no encontrado' });
@@ -58,6 +75,7 @@ const updateClient = async (req, res) => {
   }
 };
 
+// RF-05: Desactivación lógica
 const deleteClient = async (req, res) => {
   try {
     const { id } = req.params;

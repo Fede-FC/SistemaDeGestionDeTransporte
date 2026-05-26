@@ -35,8 +35,9 @@ function Clients() {
       setEditing(null);
       setForm({ name: '', contact: '' });
       fetchClients();
-    } catch {
-      setError('Error al guardar cliente');
+    } catch (err) {
+      const d = err.response?.data;
+      setError(d?.errors ? d.errors.join(' | ') : d?.error || 'Error al guardar cliente');
     }
   };
 

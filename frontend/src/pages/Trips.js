@@ -77,8 +77,9 @@ function Trips() {
       setEditing(null);
       setForm(emptyForm);
       fetchTrips();
-    } catch {
-      setError('Error al guardar viaje');
+    } catch (err) {
+      const d = err.response?.data;
+      setError(d?.errors ? d.errors.join(' | ') : d?.error || 'Error al guardar viaje');
     }
   };
 
@@ -105,12 +106,13 @@ function Trips() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('¿Eliminar este viaje?')) return;
+    if (!window.confirm('¿Desactivar este viaje? El registro se conservará en el historial.')) return;
     try {
       await api.delete(`/trips/${id}`);
       fetchTrips();
-    } catch {
-      setError('Error al eliminar viaje');
+    } catch (err) {
+      const d = err.response?.data;
+      setError(d?.errors ? d.errors.join(' | ') : d?.error || 'Error al desactivar viaje');
     }
   };
 
@@ -333,13 +335,17 @@ function Trips() {
                     {f(t.profit)}
                   </td>
                   <td style={styles.td}>
-                    <span style={{ ...styles.badgeActive, whiteSpace: 'nowrap' }}>
-                      {t.state_name}
-                    </span>
+                    {t.active === false ? (
+                      <span style={{ ...styles.badgeInactive, whiteSpace: 'nowrap' }}>Inactivo</span>
+                    ) : (
+                      <span style={{ ...styles.badgeActive, whiteSpace: 'nowrap' }}>{t.state_name}</span>
+                    )}
                   </td>
                   <td style={styles.td}>
                     <button style={styles.btnEdit} onClick={() => handleEdit(t)}>Editar</button>
-                    <button style={styles.btnDelete} onClick={() => handleDelete(t.tripid)}>Eliminar</button>
+                    {t.active !== false && (
+                      <button style={styles.btnDelete} onClick={() => handleDelete(t.tripid)}>Desactivar</button>
+                    )}
                   </td>
                 </tr>
               ))}

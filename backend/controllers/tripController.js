@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { validateDateNotFuture, validatePositiveAmount, collectErrors } = require('../middleware/validators');
 
 const getTrips = async (req, res) => {
   try {
@@ -71,14 +72,48 @@ const createTrip = async (req, res) => {
       clientid, payment_received, container_number, invoice_number,
       description, dua_number, equipment_size, weight, operation_type
     } = req.body;
+
+    // RF-06: Restricciones de negocio
+    const errors = collectErrors([
+      !trip_date          ? 'La fecha del viaje es obligatoria' : null,
+      validateDateNotFuture(trip_date, 'La fecha del viaje'),
+      !vehicleid          ? 'El vehículo es obligatorio' : null,
+      !driverid           ? 'El conductor es obligatorio' : null,
+      !clientid           ? 'El cliente es obligatorio' : null,
+      !origin || !origin.trim()           ? 'El origen es obligatorio' : null,
+      !destination || !destination.trim() ? 'El destino es obligatorio' : null,
+      validatePositiveAmount(payment_received, 'El pago recibido'),
+    ]);
+    if (errors.length) return res.status(400).json({ errors });
+
+    // RF-06: Solo se puede asignar vehículos activos
+    const vehicle = await pool.query(
+      `SELECT active FROM vehicles WHERE vehicleid = $1 AND userid = $2`,
+      [vehicleid, req.user.userid]
+    );
+    if (vehicle.rows.length === 0)
+      return res.status(404).json({ errors: ['Vehículo no encontrado'] });
+    if (!vehicle.rows[0].active)
+      return res.status(400).json({ errors: ['No se puede asignar un vehículo inactivo a un viaje'] });
+
+    // RF-06: Solo se puede asignar conductores activos
+    const driver = await pool.query(
+      `SELECT active FROM employees WHERE employeeid = $1 AND userid = $2`,
+      [driverid, req.user.userid]
+    );
+    if (driver.rows.length === 0)
+      return res.status(404).json({ errors: ['Conductor no encontrado'] });
+    if (!driver.rows[0].active)
+      return res.status(400).json({ errors: ['No se puede asignar un conductor inactivo a un viaje'] });
+
     const result = await pool.query(
       `INSERT INTO trips
         (trip_date, vehicleid, driverid, origin, destination, clientid,
          payment_received, container_number, invoice_number, description,
          dua_number, equipment_size, weight, operation_type, userid)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
-      [trip_date, vehicleid, driverid, origin, destination, clientid,
-       payment_received || 0, container_number || null, invoice_number || null,
+      [trip_date, vehicleid, driverid, origin.trim(), destination.trim(), clientid,
+       parseFloat(payment_received), container_number || null, invoice_number || null,
        description || null, dua_number || null, equipment_size || null,
        weight || null, operation_type || null, req.user.userid]
     );
@@ -96,14 +131,43 @@ const updateTrip = async (req, res) => {
       payment_received, container_number, invoice_number, description,
       stateid, dua_number, equipment_size, weight, operation_type
     } = req.body;
+
+    // RF-07: Validar al editar — recalculo de ganancia es automático (RC-04)
+    const errors = collectErrors([
+      validateDateNotFuture(trip_date, 'La fecha del viaje'),
+      validatePositiveAmount(payment_received, 'El pago recibido'),
+      !origin || !origin.trim()           ? 'El origen es obligatorio' : null,
+      !destination || !destination.trim() ? 'El destino es obligatorio' : null,
+    ]);
+    if (errors.length) return res.status(400).json({ errors });
+
+    // RF-07: Solo se puede reasignar vehículos y conductores activos (R-02.3, R-04.2)
+    const vehicle = await pool.query(
+      `SELECT active FROM vehicles WHERE vehicleid = $1 AND userid = $2`,
+      [vehicleid, req.user.userid]
+    );
+    if (vehicle.rows.length === 0)
+      return res.status(404).json({ errors: ['Vehículo no encontrado'] });
+    if (!vehicle.rows[0].active)
+      return res.status(400).json({ errors: ['No se puede asignar un vehículo inactivo a un viaje'] });
+
+    const driver = await pool.query(
+      `SELECT active FROM employees WHERE employeeid = $1 AND userid = $2`,
+      [driverid, req.user.userid]
+    );
+    if (driver.rows.length === 0)
+      return res.status(404).json({ errors: ['Conductor no encontrado'] });
+    if (!driver.rows[0].active)
+      return res.status(400).json({ errors: ['No se puede asignar un conductor inactivo a un viaje'] });
+
     const result = await pool.query(
       `UPDATE trips SET trip_date=$1, vehicleid=$2, driverid=$3, origin=$4,
         destination=$5, clientid=$6, payment_received=$7, container_number=$8,
         invoice_number=$9, description=$10, stateid=$11, dua_number=$12,
         equipment_size=$13, weight=$14, operation_type=$15, updated_at=CURRENT_TIMESTAMP
        WHERE tripid=$16 AND userid=$17 RETURNING *`,
-      [trip_date, vehicleid, driverid, origin, destination, clientid,
-       payment_received, container_number || null, invoice_number || null,
+      [trip_date, vehicleid, driverid, origin.trim(), destination.trim(), clientid,
+       parseFloat(payment_received), container_number || null, invoice_number || null,
        description || null, stateid, dua_number || null, equipment_size || null,
        weight || null, operation_type || null, id, req.user.userid]
     );
@@ -115,14 +179,18 @@ const updateTrip = async (req, res) => {
   }
 };
 
+// RF-07: Desactivación lógica — los viajes NO se eliminan físicamente (RA-03)
 const deleteTrip = async (req, res) => {
   try {
     const { id } = req.params;
-    await pool.query(
-      `DELETE FROM trips WHERE tripid = $1 AND userid = $2`,
+    const result = await pool.query(
+      `UPDATE trips SET active = false, updated_at = CURRENT_TIMESTAMP
+       WHERE tripid = $1 AND userid = $2 RETURNING *`,
       [id, req.user.userid]
     );
-    res.json({ message: 'Viaje eliminado' });
+    if (result.rows.length === 0)
+      return res.status(404).json({ error: 'Viaje no encontrado' });
+    res.json({ message: 'Viaje desactivado', trip: result.rows[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

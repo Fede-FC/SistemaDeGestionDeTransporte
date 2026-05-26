@@ -29,6 +29,7 @@ app.use('/api/employees', require('./routes/employeeRoutes'));
 app.use('/api/clients',   require('./routes/clientRoutes'));
 app.use('/api/trips',     require('./routes/tripRoutes'));
 app.use('/api/expenses',  require('./routes/expenseRoutes'));
+app.use('/api/reports',   require('./routes/reportRoutes'));
 
 const pool = require('./config/db');
 app.get('/health', async (req, res) => {

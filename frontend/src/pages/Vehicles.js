@@ -35,8 +35,9 @@ function Vehicles() {
       setEditing(null);
       setForm({ plate: '', brand: '', model: '', year: '' });
       fetchVehicles();
-    } catch {
-      setError('Error al guardar vehículo');
+    } catch (err) {
+      const d = err.response?.data;
+      setError(d?.errors ? d.errors.join(' | ') : d?.error || 'Error al guardar vehículo');
     }
   };
 

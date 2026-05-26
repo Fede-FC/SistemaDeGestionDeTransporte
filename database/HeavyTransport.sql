@@ -97,6 +97,11 @@ CREATE TABLE trips (
     description VARCHAR(200),
     stateid INT REFERENCES trip_states(stateid),
     billing_date TIMESTAMP,
+    dua_number VARCHAR(30),
+    equipment_size VARCHAR(20),
+    weight NUMERIC(10,2),
+    operation_type VARCHAR(20) CHECK (operation_type IN ('Import','Export','National')),
+    active BOOLEAN DEFAULT TRUE,
     userid INT NOT NULL REFERENCES users(userid),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

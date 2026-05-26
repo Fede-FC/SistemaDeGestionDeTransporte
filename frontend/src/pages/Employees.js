@@ -36,8 +36,9 @@ function Employees() {
       setEditing(null);
       setForm({ id_number: '', fullname: '', hire_date: '', termination_date: '' });
       fetchEmployees();
-    } catch {
-      setError('Error al guardar empleado');
+    } catch (err) {
+      const d = err.response?.data;
+      setError(d?.errors ? d.errors.join(' | ') : d?.error || 'Error al guardar empleado');
     }
   };
 
